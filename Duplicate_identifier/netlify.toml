@@ -1,0 +1,7 @@
+# Netlify: build the static site and publish the out/ folder.
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
