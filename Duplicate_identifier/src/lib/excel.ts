@@ -78,14 +78,42 @@ function columnWidths(headers: string[], rows: Cell[][]): number[] {
   });
 }
 
-function styleHeaderRow(ws: Worksheet, count: number, fill: string) {
+/** Landscape, fit to page width, header row repeated on every printed page. */
+function setPrintLayout(ws: Worksheet, repeatHeader = true) {
+  ws.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.5, header: 0.3, footer: 0.3 },
+    ...(repeatHeader ? { printTitlesRow: "1:1" } : {}),
+  };
+  ws.headerFooter = { oddFooter: "&L&8Duplicate Identifier · Built by Vikram&R&8Page &P of &N" };
+}
+
+/** Padding, vertical centring and date format for every data column. */
+function formatColumns(ws: Worksheet, headers: string[], rows: Cell[][], centered: number[]) {
+  headers.forEach((_, c) => {
+    const col = ws.getColumn(c + 1);
+    if (rows.some((r) => r[c] instanceof Date)) col.numFmt = "dd mmm yyyy";
+    col.alignment = centered.includes(c + 1)
+      ? { vertical: "middle", horizontal: "center" }
+      : { vertical: "middle", horizontal: "left", indent: 1 };
+  });
+}
+
+function styleHeaderRow(ws: Worksheet, count: number, fill: string, centered: number[] = []) {
   const row = ws.getRow(1);
   row.height = 26;
   for (let c = 1; c <= count; c++) {
     const cell = row.getCell(c);
     cell.font = { name: FONT, bold: true, size: 11, color: { argb: COLOR.white } };
     cell.fill = solid(fill);
-    cell.alignment = { vertical: "middle", horizontal: "left", indent: 1 };
+    cell.alignment = centered.includes(c)
+      ? { vertical: "middle", horizontal: "center" }
+      : { vertical: "middle", horizontal: "left", indent: 1 };
     cell.border = { bottom: thin(fill) } as Partial<Borders>;
   }
 }
@@ -100,19 +128,18 @@ function addTableSheet(
   headers: string[],
   rows: Cell[][],
   accent: string,
+  centered: number[] = [],
 ): Worksheet {
   const ws = wb.addWorksheet(name, {
     views: [{ state: "frozen", ySplit: 1, showGridLines: false }],
-    properties: { tabColor: { argb: accent } },
+    properties: { tabColor: { argb: accent }, defaultRowHeight: 20 },
   });
   const widths = columnWidths(headers, rows);
   ws.columns = headers.map((h, i) => ({ header: h, width: widths[i] }));
   ws.addRows(rows);
-  styleHeaderRow(ws, headers.length, accent);
-
-  headers.forEach((_, c) => {
-    if (rows.some((r) => r[c] instanceof Date)) ws.getColumn(c + 1).numFmt = "dd mmm yyyy";
-  });
+  formatColumns(ws, headers, rows, centered);
+  styleHeaderRow(ws, headers.length, accent, centered);
+  setPrintLayout(ws);
 
   if (headers.length > 0) {
     const last = ws.getColumn(headers.length).letter;
@@ -153,6 +180,8 @@ function addSummarySheet(wb: Workbook, ctx: ExportContext, title: string) {
     properties: { tabColor: { argb: COLOR.brandDark } },
   });
   ws.columns = [{ width: 3 }, { width: 30 }, { width: 46 }];
+  setPrintLayout(ws, false);
+  ws.pageSetup.orientation = "portrait";
 
   const titleCell = ws.getCell("B2");
   titleCell.value = "Duplicate Identifier";
@@ -256,14 +285,14 @@ export async function downloadCleanWorkbook(ctx: ExportContext) {
     const removedRows = [...removed]
       .sort((a, b) => a - b)
       .map((r) => [r + 2, (replacedBy.get(r) ?? r) + 2, ...dataset.rows[r]] as Cell[]);
-    const ws = addTableSheet(
+    addTableSheet(
       wb,
       "Removed Rows",
       ["Original row", "Duplicate of row", ...dataset.headers],
       removedRows,
       COLOR.rose,
+      [1, 2],
     );
-    for (const c of [1, 2]) ws.getColumn(c).alignment = { horizontal: "center" };
   }
   await save(wb, `${baseName(dataset.fileName)}_clean.xlsx`);
 }
@@ -274,7 +303,7 @@ export async function downloadReportWorkbook(ctx: ExportContext) {
   const headers = ["Group", "Action", "Original row", ...dataset.headers];
   const ws = wb.addWorksheet("Duplicates", {
     views: [{ state: "frozen", ySplit: 1, xSplit: 3, showGridLines: false }],
-    properties: { tabColor: { argb: COLOR.brand } },
+    properties: { tabColor: { argb: COLOR.brand }, defaultRowHeight: 20 },
   });
 
   const rows: Cell[][] = [];
@@ -292,12 +321,10 @@ export async function downloadReportWorkbook(ctx: ExportContext) {
   const widths = columnWidths(headers, rows);
   ws.columns = headers.map((h, i) => ({ header: h, width: i < 3 ? Math.max(widths[i], 14) : widths[i] }));
   ws.addRows(rows);
-  styleHeaderRow(ws, headers.length, COLOR.brand);
+  formatColumns(ws, headers, rows, [1, 2, 3]);
+  styleHeaderRow(ws, headers.length, COLOR.brand, [1, 2, 3]);
+  setPrintLayout(ws);
   ws.autoFilter = { from: "A1", to: `${ws.getColumn(headers.length).letter}1` };
-  headers.forEach((_, c) => {
-    if (rows.some((r) => r[c] instanceof Date)) ws.getColumn(c + 1).numFmt = "dd mmm yyyy";
-  });
-
   const actionStyle: Record<string, { fill: string; font: string }> = {
     Keep: { fill: COLOR.greenSoft, font: COLOR.greenText },
     Remove: { fill: COLOR.roseSoft, font: COLOR.roseText },
@@ -313,14 +340,11 @@ export async function downloadReportWorkbook(ctx: ExportContext) {
       if (m.firstOfGroup && i > 0) cell.border = { top: thin(COLOR.border) } as Partial<Borders>;
       if (m.action === "Remove" && c > 3) cell.font = { name: FONT, color: { argb: COLOR.muted } };
     }
-    row.getCell(1).alignment = { horizontal: "center" };
     row.getCell(1).font = { name: FONT, bold: true, color: { argb: COLOR.brand } };
-    row.getCell(3).alignment = { horizontal: "center" };
     const style = actionStyle[m.action];
     const actionCell = row.getCell(2);
     actionCell.fill = solid(style.fill);
     actionCell.font = { name: FONT, bold: true, color: { argb: style.font } };
-    actionCell.alignment = { horizontal: "center" };
   });
 
   addSummarySheet(wb, ctx, "Duplicates report");

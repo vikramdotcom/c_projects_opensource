@@ -31,7 +31,7 @@ async function resolveFile(urlPath) {
   return null;
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const file = (await resolveFile(req.url ?? "/")) ?? join(root, "404.html");
   try {
     const body = await readFile(file);
@@ -41,4 +41,13 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(500).end("Run `npm run build` first.");
   }
-}).listen(port, () => console.log(`Preview running at http://localhost:${port}`));
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`Port ${port} is already in use. Try: PORT=4000 npm run preview`);
+    process.exit(1);
+  }
+  throw err;
+});
+server.listen(port, () => console.log(`Preview running at http://localhost:${port}`));
