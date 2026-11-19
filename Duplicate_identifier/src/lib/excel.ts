@@ -74,7 +74,7 @@ function columnWidths(headers: string[], rows: Cell[][]): number[] {
       const len = v instanceof Date ? 11 : cellToString(v).length;
       if (len > max) max = len;
     }
-    return Math.min(Math.max(max + 2, 10), 50);
+    return Math.min(Math.max(max + 4, 10), 54); // +4 covers the cell indent
   });
 }
 

@@ -20,7 +20,13 @@ Built by **Vikram**.
   - Text can ignore case, extra spaces and punctuation.
 - **Pick the row to keep.** First, last, or the most complete row. You can override this for each group.
 - **Review screen.** Change the kept row or mark a group as "Not duplicates".
-- **Downloads.** A clean Excel or CSV file, plus a duplicates report listing every group with a Keep or Remove action.
+- **Professional Excel downloads.**
+  - The clean workbook has a styled "Clean Data" sheet with a coloured frozen header, filters, banded rows, fitted column widths and formatted dates.
+  - A "Summary" sheet shows the source file, matching rules and results.
+  - A "Removed Rows" sheet lists every removed row and the row it duplicated.
+  - The duplicates report colour-codes each row as Keep, Remove or Not duplicate.
+  - Every sheet is set up to print landscape, fitted to page width.
+- **CSV download.** A plain clean CSV is also available.
 - **Stays responsive.** Detection runs in a Web Worker with a progress bar and a cancel button.
 - Light and dark mode, keyboard accessible, works on phones.
 
@@ -30,7 +36,8 @@ Built by **Vikram**.
 |---|---|
 | Framework | Next.js 16 (App Router) with React 19 and TypeScript |
 | Styling | Tailwind CSS 4 |
-| Reading and writing files | SheetJS (`xlsx` 0.20.3 from the official SheetJS CDN) |
+| Reading files and CSV export | SheetJS (`xlsx` 0.20.3 from the official SheetJS CDN) |
+| Styled Excel export | ExcelJS 4.4, loaded only when you download |
 | Duplicate detection | Custom TypeScript: trigram index, Levenshtein similarity, union-find grouping |
 | Background processing | Web Worker |
 | Tests | Node.js built-in test runner |
